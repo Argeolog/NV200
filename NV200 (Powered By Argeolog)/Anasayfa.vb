@@ -27,12 +27,12 @@ Public Class Anasayfa
 
     Sub Kanallari_Ayarla()
         Dim Bytes(6) As Byte
-        Bytes(0) = CByte(Kanal_1_Check.Checked)
-        Bytes(1) = CByte(Kanal_2_Check.Checked)
-        Bytes(2) = CByte(Kanal_3_Check.Checked)
-        Bytes(3) = CByte(Kanal_4_Check.Checked)
-        Bytes(4) = CByte(Kanal_5_Check.Checked)
-        Bytes(5) = CByte(Kanal_6_Check.Checked)
+        Bytes(0) = CByte(Math.Abs(CInt((Kanal_1_Check.Checked))))
+        Bytes(1) = CByte(Math.Abs(CInt((Kanal_2_Check.Checked))))
+        Bytes(2) = CByte(Math.Abs(CInt((Kanal_3_Check.Checked))))
+        Bytes(3) = CByte(Math.Abs(CInt((Kanal_4_Check.Checked))))
+        Bytes(4) = CByte(Math.Abs(CInt((Kanal_5_Check.Checked))))
+        Bytes(5) = CByte(Math.Abs(CInt((Kanal_6_Check.Checked))))
 
         NV.Kanallari_Ayarla(Bytes)
     End Sub
@@ -145,6 +145,10 @@ Public Class Anasayfa
     End Sub
 
     Private Sub Kanal_Durum_GrupBox_Enter(sender As Object, e As EventArgs) Handles Kanal_Durum_GrupBox.Enter
+
+    End Sub
+
+    Private Sub Kanal_1_Check_CheckedChanged(sender As Object, e As EventArgs) Handles Kanal_1_Check.CheckedChanged
 
     End Sub
 End Class

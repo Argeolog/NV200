@@ -496,6 +496,7 @@ Public Class NV200_SDK
         Log_Yazdir("Senkronizasyon Verisi Gönderiliyor.")
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_SYNC
         SSPCommand.CommandDataLength = 1
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_SYNC")
         Return SSPSendCommand(SSPCommand)
 
     End Function
@@ -530,6 +531,7 @@ Public Class NV200_SDK
                 Log_Yazdir("Seri No Okuma Gönderiliyor.")
                 SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_SERIAL_NUMBER
                 SSPCommand.CommandDataLength = 1
+                Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_SERIAL_NUMBER")
 
                 If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili Then
                     Log_Yazdir("SeriNo Okuma Gönderildi.")
@@ -726,18 +728,31 @@ Public Class NV200_SDK
         Return False
     End Function
 
-    Private Function SetProtocolVersion(Versiyon As Byte) As Boolean
+    Private Function Versiyon_Ayarla() As Boolean
 
         Timer_Durdur()
 
+        Dim SonVersiyon As Byte = &H6
+
+        For i As Byte = 6 To 12
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_HOST_PROTOCOL_VERSION
+            SSPCommand.CommandData(1) = i
+            SSPCommand.CommandDataLength = 2
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                SonVersiyon = i
+            Else
+                Exit For
+            End If
+        Next
+
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_HOST_PROTOCOL_VERSION
-        SSPCommand.CommandData(1) = 8
+        SSPCommand.CommandData(1) = SonVersiyon
         SSPCommand.CommandDataLength = 2
         Log_Yazdir("Gönderilen Komut:SSP_CMD_HOST_PROTOCOL_VERSION")
 
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
-            Log_Yazdir("Versiyon Ayarlanıyor.")
+            Log_Yazdir("Versiyon Ayarlandı.")
             Return True
         End If
 
@@ -754,9 +769,7 @@ Public Class NV200_SDK
 
         Timer_Durdur()
 
-        SetProtocolVersion(8)
-
-
+        Versiyon_Ayarla()
 
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_SETUP_REQUEST
         SSPCommand.CommandDataLength = 1
@@ -844,7 +857,7 @@ Public Class NV200_SDK
                 KanalDurumu.ParaBirimi(1) = ChrW(SSPCommand.ResponseData((index + 1) + (i * 3)))
                 KanalDurumu.ParaBirimi(2) = ChrW(SSPCommand.ResponseData((index + 2) + (i * 3)))
                 ' Kanal seviyesi
-                KanalDurumu.BanknotAdet = CheckNoteLevel(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
+                KanalDurumu.BanknotAdet = Banknot_Adet_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
                 KanalDurumu.KasayaIndir = Kanal_Yonlendirme_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
                 ' Veriyi listeye ekle
                 KanalListesi.Add(KanalDurumu)
@@ -884,7 +897,7 @@ Public Class NV200_SDK
 
 
 
-    Public Function CheckNoteLevel(Banknot As Integer, ParaBirimi As Char()) As Integer
+    Public Function Banknot_Adet_Getir(Banknot As Integer, ParaBirimi As Char()) As Integer
 
 
         Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot)
@@ -898,7 +911,7 @@ Public Class NV200_SDK
         SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)) And &HFF)
         SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)) And &HFF)
         SSPCommand.CommandDataLength = 8
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_LEVEL")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Return CInt(SSPCommand.ResponseData(1))
         End If
@@ -919,7 +932,7 @@ Public Class NV200_SDK
         SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)))
         SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)))
         SSPCommand.CommandDataLength = 8
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_ROUTE")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             If SSPCommand.ResponseData(1) = &H0 Then
                 Return False ' False ise değil
@@ -958,7 +971,7 @@ Public Class NV200_SDK
         SSPCommand.CommandData(7) = CByte(AscW(ParaBirimChr(1)))
         SSPCommand.CommandData(8) = CByte(AscW(ParaBirimChr(2)))
         SSPCommand.CommandDataLength = 9
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_DENOMINATION_ROUTE")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
 
             Dim KasaStr As String = "Kasaya İnecek"
@@ -1384,11 +1397,14 @@ Public Class NV200_SDK
             KanalSetByte = CByte(KanalSetByte Or (KanalList(i) << i))
         Next
 
+
+
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_CHANNEL_INHIBITS
         SSPCommand.CommandData(1) = KanalSetByte
         SSPCommand.CommandData(2) = &HFF
         SSPCommand.CommandDataLength = 3
         Log_Yazdir("Kanallar Ayarlanıyor")
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_CHANNEL_INHIBITS")
 
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
@@ -1408,7 +1424,7 @@ Public Class NV200_SDK
 
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_SMART_EMPTY
         SSPCommand.CommandDataLength = 1
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_SMART_EMPTY")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
             Log_Yazdir("Akıllı Kaset Boşaltma İşlemi Başladı.")
@@ -1429,7 +1445,7 @@ Public Class NV200_SDK
 
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_EMPTY_ALL
         SSPCommand.CommandDataLength = 1
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_EMPTY_ALL")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
             Log_Yazdir("Tüm Kaset Kasaya Aktarma İşlemi Başladı.")
@@ -1449,7 +1465,7 @@ Public Class NV200_SDK
 
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_RESET
         SSPCommand.CommandDataLength = 1
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_RESET")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
             Log_Yazdir("Cihaz Yeniden Başlatma Başarılı.")
@@ -1492,7 +1508,7 @@ Public Class NV200_SDK
         SSPCommand.CommandData(10) = CByte(AscW(ParaBirimi(2)))
         SSPCommand.CommandDataLength = 11 ' toplam kaç byte doluysa
 
-
+        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_Limit_Belirle")
         If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
             Timer_Baslat()
             Log_Yazdir("Kanal Limit Ayarlama Başarılı.")
