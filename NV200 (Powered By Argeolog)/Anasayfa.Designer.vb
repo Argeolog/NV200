@@ -406,7 +406,7 @@ Partial Class Anasayfa
         Me.Controls.Add(Me.TextBox1)
         Me.Name = "Anasayfa"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
-        Me.Text = "Form1"
+        Me.Text = "NV200 SDK (Argeolog)"
         Me.GroupBox1.ResumeLayout(False)
         Me.GroupBox1.PerformLayout()
         CType(Me.Verilecek_Para_Text, System.ComponentModel.ISupportInitialize).EndInit()
