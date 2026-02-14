@@ -14,7 +14,7 @@ Public Class NV200_SDK
     Private TimerCalisiyor As Boolean
 
     Public LogTextBox As TextBox
-    Private SerialComPort As SerialPort
+    Public SerialComPort As SerialPort
 
     ReadOnly SSPCommand As New SSP_COMMAND
     ReadOnly ssp As New SSP_TX_RX_PACKET
@@ -25,8 +25,9 @@ Public Class NV200_SDK
     ReadOnly PaketSayisi As UInteger = 0
     Public KanalListesi As New List(Of KanalData)
     Public BanknotCarpanDeger As Integer = 1
+    Public ReadOnly LogErrorKlasorYolu As String = Application.StartupPath & "\Log"
 
-    Dim m_ProtocolVersion As Integer = 0
+
 
     ' --- SSP SINIFLARI (ORİJİNAL KODDAN) ---
     Public Class SSP_FULL_KEY
@@ -255,43 +256,45 @@ Public Class NV200_SDK
     End Class
 
     Sub Poll_Sonuc_Degerlendir()
+        Try
 
-        Dim ResponseLength As Integer = SSPCommand.ResponseDataLength
-        Dim ResponseData(ResponseLength - 1) As Byte
-        Array.Copy(SSPCommand.ResponseData, ResponseData, ResponseLength)
-        Dim i As Integer
 
-        ' Poll yanıtını parse et
-        Dim data As New KanalData()
-        i = 1
-        While i < SSPCommand.ResponseDataLength
-            Select Case ResponseData(i)
+            Dim ResponseLength As Integer = SSPCommand.ResponseDataLength
+            Dim ResponseData(ResponseLength - 1) As Byte
+            Array.Copy(SSPCommand.ResponseData, ResponseData, ResponseLength)
+            Dim i As Integer
+
+            ' Poll yanıtını parse et
+            Dim data As New KanalData()
+            i = 1
+            While i < SSPCommand.ResponseDataLength
+                Select Case ResponseData(i)
                     ' Bu yanıt, birimin sıfırlandığını ve reset'ten bu yana ilk kez 
                     ' poll çağrıldığını gösterir.
-                Case CCommands.SSP_POLL_SLAVE_RESET
-                    Log_Yazdir("Birim sıfırlandı.")
+                    Case CCommands.SSP_POLL_SLAVE_RESET
+                        Log_Yazdir("Birim sıfırlandı.")
                             'UpdateData()
 
                     ' Bu yanıt birimin devre dışı olduğunu gösterir.
-                Case CCommands.SSP_POLL_DISABLED
-                    Log_Yazdir("Birim devre dışı.")
+                    Case CCommands.SSP_POLL_DISABLED
+                        Log_Yazdir("Birim devre dışı.")
 
                     ' Bir not şu anda validatör sensörleri tarafından okunuyor.
-                Case CCommands.SSP_POLL_READ_NOTE
+                    Case CCommands.SSP_POLL_READ_NOTE
 
-                    If SSPCommand.ResponseData(i + 1) > 0 Then
-                        Log_Yazdir("Banknot Ortada Bekliyor.")
+                        If SSPCommand.ResponseData(i + 1) > 0 Then
+                            Log_Yazdir("Banknot Ortada Bekliyor.")
 
-                        ' GetDataByChannel(response(i + 1), data)
-                        'Log.AppendText("Escrow'da not, miktar: " & FormatToCurrency(data.Value) & vbCrLf)
-                        'm_HoldCount = m_HoldNumber
-                    Else
-                        'Log.AppendText("Not okunuyor" & vbCrLf)
-                        Log_Yazdir("Banknot Okunuyor.")
-                    End If
-                    i += 1
+                            ' GetDataByChannel(response(i + 1), data)
+                            'Log.AppendText("Escrow'da not, miktar: " & FormatToCurrency(data.Value) & vbCrLf)
+                            'm_HoldCount = m_HoldNumber
+                        Else
+                            'Log.AppendText("Not okunuyor" & vbCrLf)
+                            Log_Yazdir("Banknot Okunuyor.")
+                        End If
+                        i += 1
 
-                Case CCommands.SSP_POLL_CREDIT_NOTE  ' Bir kredi olayı tespit edildi, bu validatörün bir notu yasal para olarak kabul ettiği zamandır.
+                    Case CCommands.SSP_POLL_CREDIT_NOTE  ' Bir kredi olayı tespit edildi, bu validatörün bir notu yasal para olarak kabul ettiği zamandır.
 
                             'GetDataByChannel(response(i + 1), data)
                             'Log.AppendText("Kredi " & FormatToCurrency(data.Value) & vbCrLf)
@@ -299,31 +302,31 @@ Public Class NV200_SDK
                             'i += 1
 
                     ' Bir not validatörden reddediliyor.
-                Case CCommands.SSP_POLL_NOTE_REJECTING
+                    Case CCommands.SSP_POLL_NOTE_REJECTING
                             'Log.AppendText("Not reddediliyor" & vbCrLf)
 
                     ' Bir not validatörden reddedildi, not bezel'de olacak.
-                Case CCommands.SSP_POLL_NOTE_REJECTED
+                    Case CCommands.SSP_POLL_NOTE_REJECTED
                             'Log.AppendText("Not reddedildi" & vbCrLf)
                             'QueryRejection(Log)
 
                     ' Bir not cashbox'a taşınıyor.
-                Case CCommands.SSP_POLL_NOTE_STACKING
+                    Case CCommands.SSP_POLL_NOTE_STACKING
                             'Log.AppendText("Not istifleniyor" & vbCrLf)
 
                     ' Ödeme cihazı belirtilen miktarda notu 'floating' yapıyor.
-                Case CCommands.SSP_POLL_FLOATING
+                    Case CCommands.SSP_POLL_FLOATING
 
                             'Log.AppendText("Notlar floating yapılıyor" & vbCrLf)
                             ' Şimdi indeks, bu yanıt tarafından sağlanan verilerin üzerinden atlamak için ilerletilmeli
                             'i += CByte((response(i + 1) * 7) + 1)
 
                     ' Bir not cashbox'a ulaştı.
-                Case CCommands.SSP_POLL_NOTE_STACKED
-                    'Log.AppendText("Not istiflendi" & vbCrLf)
-                    Log_Yazdir("Banknot İstifendi.")
+                    Case CCommands.SSP_POLL_NOTE_STACKED
+                        'Log.AppendText("Not istiflendi" & vbCrLf)
+                        Log_Yazdir("Banknot İstifendi.")
                     ' Float işlemi tamamlandı.
-                Case CCommands.SSP_POLL_FLOATED
+                    Case CCommands.SSP_POLL_FLOATED
                             'Log.AppendText("Floating tamamlandı" & vbCrLf)
                             'GetCashboxPayoutOpData(Log)
                             'UpdateData()
@@ -331,141 +334,143 @@ Public Class NV200_SDK
                             'i += CByte((response(i + 1) * 7) + 1)
 
                     ' Bir not ödeme için cashbox'a gitmek yerine payout cihazında saklandı.
-                Case CCommands.SSP_POLL_NOTE_STORED_IN_PAYOUT
-                    Log_Yazdir("Banknot Saklandı.")
+                    Case CCommands.SSP_POLL_NOTE_STORED_IN_PAYOUT
+                        Log_Yazdir("Banknot Saklandı.")
                             'Log.AppendText("Not saklandı" & vbCrLf)
                             'UpdateData()
 
                     ' Güvenli sıkışma tespit edildi.
-                Case CCommands.SSP_POLL_SAFE_NOTE_JAM
+                    Case CCommands.SSP_POLL_SAFE_NOTE_JAM
                             'Log.AppendText("Güvenli sıkışma" & vbCrLf)
 
                     ' Güvensiz sıkışma tespit edildi.
-                Case CCommands.SSP_POLL_UNSAFE_NOTE_JAM
+                    Case CCommands.SSP_POLL_UNSAFE_NOTE_JAM
                             'Log.AppendText("Güvensiz sıkışma" & vbCrLf)
 
                     ' Ödeme birimi tarafından bir hata tespit edildi.
-                Case CCommands.SSP_POLL_ERROR_DURING_PAYOUT
-                    'Log.AppendText("Ödeme cihazında hata tespit edildi" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 2)
+                    Case CCommands.SSP_POLL_ERROR_DURING_PAYOUT
+                        'Log.AppendText("Ödeme cihazında hata tespit edildi" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 2)
 
                     ' Sahtecilik girişimi tespit edildi.
-                Case CCommands.SSP_POLL_FRAUD_ATTEMPT
-                    'Log.AppendText("Sahtecilik girişimi" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_FRAUD_ATTEMPT
+                        'Log.AppendText("Sahtecilik girişimi" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Stacker (cashbox) dolu.
-                Case CCommands.SSP_POLL_STACKER_FULL
+                    Case CCommands.SSP_POLL_STACKER_FULL
                             'Log.AppendText("Stacker dolu" & vbCrLf)
 
                     ' Başlangıçta validatörün içinde bir not tespit edildi ve birimin önünden reddedildi.
-                Case CCommands.SSP_POLL_NOTE_CLEARED_FROM_FRONT
-                    'Log.AppendText("Validatörün önünden not temizlendi" & vbCrLf)
-                    i += 1
+                    Case CCommands.SSP_POLL_NOTE_CLEARED_FROM_FRONT
+                        'Log.AppendText("Validatörün önünden not temizlendi" & vbCrLf)
+                        i += 1
 
                     ' Başlangıçta validatörün içinde bir not tespit edildi ve cashbox'a temizlendi.
-                Case CCommands.SSP_POLL_NOTE_CLEARED_TO_CASHBOX
-                    'Log.AppendText("Not cashbox'a temizlendi" & vbCrLf)
-                    i += 1
+                    Case CCommands.SSP_POLL_NOTE_CLEARED_TO_CASHBOX
+                        'Log.AppendText("Not cashbox'a temizlendi" & vbCrLf)
+                        i += 1
 
                     ' Başlangıçta validatörde bir not tespit edildi ve payout cihazına taşındı.
-                Case CCommands.SSP_POLL_NOTE_PAID_INTO_STORE_AT_POWER_UP
-                    'Log.AppendText("Başlangıçta not payout cihazına yatırıldı" & vbCrLf)
-                    i += 7
+                    Case CCommands.SSP_POLL_NOTE_PAID_INTO_STORE_AT_POWER_UP
+                        'Log.AppendText("Başlangıçta not payout cihazına yatırıldı" & vbCrLf)
+                        i += 7
 
                     ' Başlangıçta validatörde bir not tespit edildi ve cashbox'a taşındı.
-                Case CCommands.SSP_POLL_NOTE_PAID_INTO_STACKER_AT_POWER_UP
-                    'Log.AppendText("Başlangıçta not cashbox'a yatırıldı" & vbCrLf)
-                    i += 7
+                    Case CCommands.SSP_POLL_NOTE_PAID_INTO_STACKER_AT_POWER_UP
+                        'Log.AppendText("Başlangıçta not cashbox'a yatırıldı" & vbCrLf)
+                        i += 7
 
                     ' Cashbox birimden çıkarıldı.
-                Case CCommands.SSP_POLL_CASHBOX_REMOVED
+                    Case CCommands.SSP_POLL_CASHBOX_REMOVED
                             'Log.AppendText("Cashbox çıkarıldı" & vbCrLf)
 
                     ' Cashbox yerine kondu.
-                Case CCommands.SSP_POLL_CASHBOX_REPLACED
+                    Case CCommands.SSP_POLL_CASHBOX_REPLACED
                            'Log.AppendText("Cashbox yerine kondu" & vbCrLf)
 
                     ' Validatör bir not ödemesi yapma sürecinde.
-                Case CCommands.SSP_POLL_DISPENSING
-                    'Log.AppendText("Not(lar) dağıtılıyor" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_DISPENSING
+                        'Log.AppendText("Not(lar) dağıtılıyor" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Not dağıtıldı ve kullanıcı tarafından bezel'den alındı.
-                Case CCommands.SSP_POLL_DISPENSED
-                    'Log.AppendText("Not(lar) dağıtıldı" & vbCrLf)
-                    'UpdateData()
-                    'EnableValidator()
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_DISPENSED
+                        'Log.AppendText("Not(lar) dağıtıldı" & vbCrLf)
+                        'UpdateData()
+                        'EnableValidator()
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Ödeme cihazı sakladığı tüm notları cashbox'a boşaltma sürecinde.
-                Case CCommands.SSP_POLL_EMPTYING
+                    Case CCommands.SSP_POLL_EMPTYING
                             'Log.AppendText("Boşaltılıyor" & vbCrLf)
 
                     ' Ödeme cihazı boşaltmayı tamamladı.
-                Case CCommands.SSP_POLL_EMPTIED
+                    Case CCommands.SSP_POLL_EMPTIED
                             'Log.AppendText("Boşaltıldı" & vbCrLf)
                             'UpdateData()
                             'EnableValidator()
 
                     ' Ödeme cihazı sakladığı tüm notları cashbox'a SMART boşaltma sürecinde.
-                Case CCommands.SSP_POLL_SMART_EMPTYING
-                    'Log.AppendText("SMART Boşaltma yapılıyor..." & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_SMART_EMPTYING
+                        'Log.AppendText("SMART Boşaltma yapılıyor..." & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Ödeme cihazı SMART boşaltmayı tamamladı.
-                Case CCommands.SSP_POLL_SMART_EMPTIED
-                    'Log.AppendText("SMART Boşaltıldı, bilgi alınıyor..." & vbCrLf)
-                    'UpdateData()
-                    'GetCashboxPayoutOpData(Log)
-                    'EnableValidator()
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_SMART_EMPTIED
+                        'Log.AppendText("SMART Boşaltıldı, bilgi alınıyor..." & vbCrLf)
+                        'UpdateData()
+                        'GetCashboxPayoutOpData(Log)
+                        'EnableValidator()
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Ödeme cihazı sıkışma ile karşılaştı.
-                Case CCommands.SSP_POLL_JAMMED
-                    'Log.AppendText("Birim sıkıştı..." & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_JAMMED
+                        'Log.AppendText("Birim sıkıştı..." & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Ödeme bir host komutu tarafından durdurulduğunda bildirilir.
-                Case CCommands.SSP_POLL_HALTED
-                    'Log.AppendText("Durduruldu..." & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_HALTED
+                        'Log.AppendText("Durduruldu..." & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
                     ' Ödeme işlemi sırasında güç kesildiğinde bildirilir.
-                Case CCommands.SSP_POLL_INCOMPLETE_PAYOUT
-                    'Log.AppendText("Tamamlanmamış ödeme" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 11) + 1)
+                    Case CCommands.SSP_POLL_INCOMPLETE_PAYOUT
+                        'Log.AppendText("Tamamlanmamış ödeme" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 11) + 1)
 
                     ' Float işlemi sırasında güç kesildiğinde bildirilir.
-                Case CCommands.SSP_POLL_INCOMPLETE_FLOAT
-                    'Log.AppendText("Tamamlanmamış float" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 11) + 1)
+                    Case CCommands.SSP_POLL_INCOMPLETE_FLOAT
+                        'Log.AppendText("Tamamlanmamış float" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 11) + 1)
 
                     ' Bir not payout biriminden stacker'a transfer edildi.
-                Case CCommands.SSP_POLL_NOTE_TRANSFERED_TO_STACKER
-                    'Log.AppendText("Not stacker'a transfer edildi" & vbCrLf)
-                    i += 7
+                    Case CCommands.SSP_POLL_NOTE_TRANSFERED_TO_STACKER
+                        'Log.AppendText("Not stacker'a transfer edildi" & vbCrLf)
+                        i += 7
 
                     ' Bir not kullanıcı tarafından alınmayı beklerken bezel'de duruyor.
-                Case CCommands.SSP_POLL_NOTE_HELD_IN_BEZEL
-                    'Log.AppendText("Bezel'de not bekleniyor..." & vbCrLf)
-                    i += 7
-                    Log_Yazdir("Banknot Bezelde Bekliyor.")
+                    Case CCommands.SSP_POLL_NOTE_HELD_IN_BEZEL
+                        'Log.AppendText("Bezel'de not bekleniyor..." & vbCrLf)
+                        i += 7
+                        Log_Yazdir("Banknot Bezelde Bekliyor.")
                     ' Ödeme servis dışı kaldı.
-                Case CCommands.SSP_POLL_PAYOUT_OUT_OF_SERVICE
+                    Case CCommands.SSP_POLL_PAYOUT_OUT_OF_SERVICE
                             'Log.AppendText("Ödeme servis dışı..." & vbCrLf)
 
                     ' Birim ödenecek bir not ararken zaman aşımına uğradı.
-                Case CCommands.SSP_POLL_TIME_OUT
-                    'Log.AppendText("Not aranırken zaman aşımı" & vbCrLf)
-                    i += CByte((ResponseData(i + 1) * 7) + 1)
+                    Case CCommands.SSP_POLL_TIME_OUT
+                        'Log.AppendText("Not aranırken zaman aşımı" & vbCrLf)
+                        i += CByte((ResponseData(i + 1) * 7) + 1)
 
-                Case Else
-                    ' Log.AppendText("Desteklenmeyen poll yanıtı alındı: " & CInt(SSPCommand.ResponseData(i)) & vbCrLf)
-            End Select
-            i += 1
-        End While
+                    Case Else
+                        ' Log.AppendText("Desteklenmeyen poll yanıtı alındı: " & CInt(SSPCommand.ResponseData(i)) & vbCrLf)
+                End Select
+                i += 1
+            End While
+        Catch ex As Exception
 
+        End Try
     End Sub
 
 
@@ -473,26 +478,33 @@ Public Class NV200_SDK
     ' ANA FONKSİYON
     ' ----------------------------------------------------------------
     Private Sub CihazSorguTimer_Tick(sender As Object, e As EventArgs) Handles CihazSorguTimer.Elapsed
-        CihazSorguTimer.Enabled = False
-        TimerCalisiyor = True
+
+        Try
 
 
-        If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen Then
+            CihazSorguTimer.Enabled = False
+            TimerCalisiyor = True
 
-            SSPCommand.CommandData(0) = CCommands.SSP_CMD_POLL
-            SSPCommand.CommandDataLength = 1
-            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili Then
-                Poll_Sonuc_Degerlendir()
+
+            If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen Then
+
+                SSPCommand.CommandData(0) = CCommands.SSP_CMD_POLL
+                SSPCommand.CommandDataLength = 1
+                If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili Then
+                    Poll_Sonuc_Degerlendir()
+                End If
+
             End If
 
-        End If
 
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
         TimerCalisiyor = False
         CihazSorguTimer.Enabled = True
     End Sub
 
     Function Senkronizasyon_Gonder() As PORT_STATUS
-
         Log_Yazdir("Senkronizasyon Verisi Gönderiliyor.")
         SSPCommand.CommandData(0) = CCommands.SSP_CMD_SYNC
         SSPCommand.CommandDataLength = 1
@@ -502,6 +514,7 @@ Public Class NV200_SDK
     End Function
 
     Sub Timer_Durdur()
+
         Dim Zaman As DateTime = Now.AddMilliseconds(CihazSorguTimer.Interval + 25)
         CihazSorguTimer.Stop()
         Do While (TimerCalisiyor)
@@ -521,38 +534,47 @@ Public Class NV200_SDK
 
     Function Seri_No_Oku() As String
 
-        Timer_Durdur()
         Dim SeriNo As String = ""
+        Try
+            Timer_Durdur()
 
-        If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen = True Then
+            If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen = True Then
 
-            If Senkronizasyon_Gonder() = PORT_STATUS.Veri_Gonderme_Basarili Then
+                If Senkronizasyon_Gonder() = PORT_STATUS.Veri_Gonderme_Basarili Then
 
-                Log_Yazdir("Seri No Okuma Gönderiliyor.")
-                SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_SERIAL_NUMBER
-                SSPCommand.CommandDataLength = 1
-                Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_SERIAL_NUMBER")
+                    Log_Yazdir("Seri No Okuma Gönderiliyor.")
+                    SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_SERIAL_NUMBER
+                    SSPCommand.CommandDataLength = 1
+                    Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_SERIAL_NUMBER")
 
-                If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili Then
-                    Log_Yazdir("SeriNo Okuma Gönderildi.")
+                    If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili Then
+                        Log_Yazdir("SeriNo Okuma Gönderildi.")
 
-                    Log_Yazdir("SeriNo Verisi Bekleniyor.")
-                    If SSPCommand.ResponseData(0) = CCommands.Veri_Alma_Basarili Then
-                        Array.Reverse(SSPCommand.ResponseData, 1, 4)
-                        SeriNo = BitConverter.ToUInt32(SSPCommand.ResponseData, 1).ToString
-                        Log_Yazdir("SeriNo Verisi Geldi. SeriNo:" & SeriNo.ToString)
-                    Else
-                        Log_Yazdir("SeriNo Okumada Hata: Hata Kodu: SeriNo:" & SSPCommand.ResponseData(0).ToString("X2"))
+                        Log_Yazdir("SeriNo Verisi Bekleniyor.")
+                        If SSPCommand.ResponseData(0) = CCommands.Veri_Alma_Basarili Then
+                            Array.Reverse(SSPCommand.ResponseData, 1, 4)
+                            SeriNo = BitConverter.ToUInt32(SSPCommand.ResponseData, 1).ToString
+                            Log_Yazdir("SeriNo Verisi Geldi. SeriNo:" & SeriNo.ToString)
+                        Else
+                            Log_Yazdir("SeriNo Okumada Hata: Hata Kodu: SeriNo:" & SSPCommand.ResponseData(0).ToString("X2"))
+                        End If
                     End If
-                End If
 
+                End If
+            Else
+                Log_Yazdir("Bağlantı Portu Kapalı.")
             End If
-        Else
-            Log_Yazdir("Bağlantı Portu Kapalı.")
-        End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
         Timer_Baslat()
         Return SeriNo.ToString
+
+
+
+
     End Function
 
     Function Validator_Ac() As Boolean
@@ -639,33 +661,41 @@ Public Class NV200_SDK
     Function Para_Ver(Miktar As Integer, ParaBirimi As String) As Boolean
 
         Timer_Durdur()
-        Dim Birim() As Char = ParaBirimi.ToCharArray
-        Miktar *= BanknotCarpanDeger
+        Try
 
-        Dim MiktarBytes As Byte() = BitConverter.GetBytes(Miktar)
 
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_PAYOUT_AMOUNT
-        SSPCommand.CommandData(1) = MiktarBytes(0)
-        SSPCommand.CommandData(2) = MiktarBytes(1)
-        SSPCommand.CommandData(3) = MiktarBytes(2)
-        SSPCommand.CommandData(4) = MiktarBytes(3)
-        SSPCommand.CommandData(5) = CByte(AscW(Birim(0)))
-        SSPCommand.CommandData(6) = CByte(AscW(Birim(1)))
-        SSPCommand.CommandData(7) = CByte(AscW(Birim(2)))
-        SSPCommand.CommandData(8) = &H58 ' gerçek ödeme (&H19 test için)
-        SSPCommand.CommandDataLength = 9
 
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_PAYOUT_AMOUNT")
+            Dim Birim() As Char = ParaBirimi.ToCharArray
+            Miktar *= BanknotCarpanDeger
 
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
-            Timer_Baslat()
-            Log_Yazdir("Ödeme Yapılıyor...")
-            Return True
-        End If
+            Dim MiktarBytes As Byte() = BitConverter.GetBytes(Miktar)
+
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_PAYOUT_AMOUNT
+            SSPCommand.CommandData(1) = MiktarBytes(0)
+            SSPCommand.CommandData(2) = MiktarBytes(1)
+            SSPCommand.CommandData(3) = MiktarBytes(2)
+            SSPCommand.CommandData(4) = MiktarBytes(3)
+            SSPCommand.CommandData(5) = CByte(AscW(Birim(0)))
+            SSPCommand.CommandData(6) = CByte(AscW(Birim(1)))
+            SSPCommand.CommandData(7) = CByte(AscW(Birim(2)))
+            SSPCommand.CommandData(8) = &H58 ' gerçek ödeme (&H19 test için)
+            SSPCommand.CommandDataLength = 9
+
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_PAYOUT_AMOUNT")
+
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                Timer_Baslat()
+                Log_Yazdir("Ödeme Yapılıyor...")
+                Return True
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
         Timer_Baslat()
         Log_Yazdir("Ödeme Yapma İşlemi Başarısız.")
-        Return True
+        Return False
     End Function
 
 
@@ -718,11 +748,10 @@ Public Class NV200_SDK
 
             Next
 
-
-
             Return True
+
         Catch ex As Exception
-            Log_Yazdir(ex.Message)
+            Veri_Logla(ex.Message, True)
         End Try
 
         Return False
@@ -771,121 +800,129 @@ Public Class NV200_SDK
 
         Versiyon_Ayarla()
 
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_SETUP_REQUEST
-        SSPCommand.CommandDataLength = 1
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_SETUP_REQUEST")
-
-        Dim Basarili As Boolean = SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili()
-        If Basarili = True Then
-            Dim sbDisplay As New StringBuilder(1000)
-            Dim index As Integer = 1
-            sbDisplay.Append("Birim Tipi: ")  ' Birim tipi
-            Dim m_UnitType As Char = ChrW(SSPCommand.ResponseData(index))
-            Select Case m_UnitType
-                Case ChrW(&H0) : sbDisplay.Append("Validatör")
-                Case ChrW(&H3) : sbDisplay.Append("SMART Hopper")
-                Case ChrW(&H6) : sbDisplay.Append("SMART Payout")
-                Case ChrW(&H7) : sbDisplay.Append("NV11")
-                Case Else : sbDisplay.Append("Bilinmeyen Tip")
-            End Select
+        Try
 
 
-            ' Firmware
-            index = 2
-            sbDisplay.AppendLine()
-            sbDisplay.Append("Firmware: ")
-            While index <= 5
-                sbDisplay.Append(ChrW(SSPCommand.ResponseData(index)))
-                index += 1
-                If index = 4 Then
-                    sbDisplay.Append(".")
-                End If
-            End While
-            sbDisplay.AppendLine()
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SETUP_REQUEST
+            SSPCommand.CommandDataLength = 1
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_SETUP_REQUEST")
+
+            Dim Basarili As Boolean = SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili()
+            If Basarili = True Then
+                Dim sbDisplay As New StringBuilder(1000)
+                Dim index As Integer = 1
+                sbDisplay.Append("Birim Tipi: ")  ' Birim tipi
+                Dim m_UnitType As Char = ChrW(SSPCommand.ResponseData(index))
+                Select Case m_UnitType
+                    Case ChrW(&H0) : sbDisplay.Append("Validatör")
+                    Case ChrW(&H3) : sbDisplay.Append("SMART Hopper")
+                    Case ChrW(&H6) : sbDisplay.Append("SMART Payout")
+                    Case ChrW(&H7) : sbDisplay.Append("NV11")
+                    Case Else : sbDisplay.Append("Bilinmeyen Tip")
+                End Select
 
 
-            ' Ülke kodu (eski kod, atla)
-            index += 3
-
-            ' Değer çarpanı (eski kod, atla)
-            index += 3
-
-            ' Kanal sayısı
-            sbDisplay.AppendLine()
-            sbDisplay.Append("Kanal Sayısı: ")
-            Dim KanalSayisi As Integer = SSPCommand.ResponseData(index)
-            index += 1
-            sbDisplay.Append(KanalSayisi)
-            sbDisplay.AppendLine()
-
-            ' Kanal değerleri (eski kod, atla)
-            index += KanalSayisi
-
-            ' Kanal güvenliği (eski kod, atla)
-            index += KanalSayisi
-
-            ' Gerçek değer çarpanı (big endian)
-            sbDisplay.Append("Gerçek Değer Çarpanı: ")
-            BanknotCarpanDeger = SSPCommand.ResponseData(index + 2)
-            BanknotCarpanDeger += SSPCommand.ResponseData(index + 1) << 8
-            BanknotCarpanDeger += SSPCommand.ResponseData(index) << 16
-
-            sbDisplay.Append(BanknotCarpanDeger)
-            sbDisplay.AppendLine()
-            index += 3
-
-            ' Protokol versiyonu
-            sbDisplay.Append("Protokol Versiyonu: ")
-            m_ProtocolVersion = SSPCommand.ResponseData(index)
-            index += 1
-            sbDisplay.Append(m_ProtocolVersion)
-            sbDisplay.AppendLine()
-
-            ' Kanal verilerini listeye ekle ve göster
-            ' Listeyi temizle
-            KanalListesi.Clear()
-
-            ' Tüm kanalları döngüye al
-            For i As Integer = 0 To KanalSayisi - 1
-                ' Kanal değeri
-                Dim KanalDurumu As New KanalData With {
-                    .KanalNo = CByte(i + 1),
-                    .Banknot = BitConverter.ToInt32(SSPCommand.ResponseData, index + (KanalSayisi * 3) + (i * 4)) * BanknotCarpanDeger
-                }
-                ' Kanal para birimi
-                KanalDurumu.ParaBirimi(0) = ChrW(SSPCommand.ResponseData(index + (i * 3)))
-                KanalDurumu.ParaBirimi(1) = ChrW(SSPCommand.ResponseData((index + 1) + (i * 3)))
-                KanalDurumu.ParaBirimi(2) = ChrW(SSPCommand.ResponseData((index + 2) + (i * 3)))
-                ' Kanal seviyesi
-                KanalDurumu.BanknotAdet = Banknot_Adet_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
-                KanalDurumu.KasayaIndir = Kanal_Yonlendirme_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
-                ' Veriyi listeye ekle
-                KanalListesi.Add(KanalDurumu)
-                ' Veriyi göster
-                sbDisplay.Append("Kanal ")
-                sbDisplay.Append(KanalDurumu.KanalNo)
-                sbDisplay.Append(": ")
-                sbDisplay.Append(KanalDurumu.Banknot \ BanknotCarpanDeger)
-                sbDisplay.Append(" ")
-                sbDisplay.Append(KanalDurumu.ParaBirimi)
-                sbDisplay.Append("Kasaya İndir:" & KanalDurumu.KasayaIndir)
+                ' Firmware
+                index = 2
                 sbDisplay.AppendLine()
-            Next
+                sbDisplay.Append("Firmware: ")
+                While index <= 5
+                    sbDisplay.Append(ChrW(SSPCommand.ResponseData(index)))
+                    index += 1
+                    If index = 4 Then
+                        sbDisplay.Append(".")
+                    End If
+                End While
+                sbDisplay.AppendLine()
 
-            KanalListesi.Sort(Function(d1, d2) d1.Banknot.CompareTo(d2.Banknot))
-            Log_Yazdir(sbDisplay.ToString)
 
-            Timer_Baslat()
-            Log_Yazdir("Cihaz Yapılandıma Başarılı.")
+                ' Ülke kodu (eski kod, atla)
+                index += 3
+
+                ' Değer çarpanı (eski kod, atla)
+                index += 3
+
+                ' Kanal sayısı
+                sbDisplay.AppendLine()
+                sbDisplay.Append("Kanal Sayısı: ")
+                Dim KanalSayisi As Integer = SSPCommand.ResponseData(index)
+                index += 1
+                sbDisplay.Append(KanalSayisi)
+                sbDisplay.AppendLine()
+
+                ' Kanal değerleri (eski kod, atla)
+                index += KanalSayisi
+
+                ' Kanal güvenliği (eski kod, atla)
+                index += KanalSayisi
+
+                ' Gerçek değer çarpanı (big endian)
+                sbDisplay.Append("Gerçek Değer Çarpanı: ")
+                BanknotCarpanDeger = SSPCommand.ResponseData(index + 2)
+                BanknotCarpanDeger += SSPCommand.ResponseData(index + 1) << 8
+                BanknotCarpanDeger += SSPCommand.ResponseData(index) << 16
+
+                sbDisplay.Append(BanknotCarpanDeger)
+                sbDisplay.AppendLine()
+                index += 3
+
+                ' Protokol versiyonu
+                sbDisplay.Append("Protokol Versiyonu: ")
+                Dim ProtokolVersiyon As Integer = SSPCommand.ResponseData(index)
+                index += 1
+                sbDisplay.Append(ProtokolVersiyon)
+                sbDisplay.AppendLine()
+
+                ' Kanal verilerini listeye ekle ve göster
+                ' Listeyi temizle
+                KanalListesi.Clear()
+
+                ' Tüm kanalları döngüye al
+                For i As Integer = 0 To KanalSayisi - 1
+                    ' Kanal değeri
+                    Dim KanalDurumu As New KanalData With {
+                        .KanalNo = CByte(i + 1),
+                        .Banknot = BitConverter.ToInt32(SSPCommand.ResponseData, index + (KanalSayisi * 3) + (i * 4)) * BanknotCarpanDeger
+                    }
+                    ' Kanal para birimi
+                    KanalDurumu.ParaBirimi(0) = ChrW(SSPCommand.ResponseData(index + (i * 3)))
+                    KanalDurumu.ParaBirimi(1) = ChrW(SSPCommand.ResponseData((index + 1) + (i * 3)))
+                    KanalDurumu.ParaBirimi(2) = ChrW(SSPCommand.ResponseData((index + 2) + (i * 3)))
+                    ' Kanal seviyesi
+                    KanalDurumu.BanknotAdet = Banknot_Adet_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
+                    KanalDurumu.KasayaIndir = Kanal_Yonlendirme_Getir(KanalDurumu.Banknot, KanalDurumu.ParaBirimi)
+                    ' Veriyi listeye ekle
+                    KanalListesi.Add(KanalDurumu)
+                    ' Veriyi göster
+                    sbDisplay.Append("Kanal ")
+                    sbDisplay.Append(KanalDurumu.KanalNo)
+                    sbDisplay.Append(": ")
+                    sbDisplay.Append(KanalDurumu.Banknot \ BanknotCarpanDeger)
+                    sbDisplay.Append(" ")
+                    sbDisplay.Append(KanalDurumu.ParaBirimi)
+                    sbDisplay.Append("Kasaya İndir:" & KanalDurumu.KasayaIndir)
+                    sbDisplay.AppendLine()
+                Next
+
+                KanalListesi.Sort(Function(d1, d2) d1.Banknot.CompareTo(d2.Banknot))
+                Log_Yazdir(sbDisplay.ToString)
+
+                Timer_Baslat()
+                Log_Yazdir("Cihaz Yapılandıma Başarılı.")
 
 
-        Else
+            Else
 
 
-            Timer_Baslat()
-            Log_Yazdir("SSP_CMD_SETUP_REQUEST Başarısız.")
-            Return Nakit_Para_Status.Basarisiz
-        End If
+                Timer_Baslat()
+                Log_Yazdir("SSP_CMD_SETUP_REQUEST Başarısız.")
+                Return Nakit_Para_Status.Basarisiz
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
+
 
         Timer_Baslat()
         Log_Yazdir("Cihaz Yapılandıma Başarısız.")
@@ -899,22 +936,32 @@ Public Class NV200_SDK
 
     Public Function Banknot_Adet_Getir(Banknot As Integer, ParaBirimi As Char()) As Integer
 
+        Timer_Durdur()
 
-        Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot)
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_DENOMINATION_LEVEL
-        SSPCommand.CommandData(1) = MiktarBytes(0)
-        SSPCommand.CommandData(2) = MiktarBytes(1)
-        SSPCommand.CommandData(3) = MiktarBytes(2)
-        SSPCommand.CommandData(4) = MiktarBytes(3)
+        Try
 
-        SSPCommand.CommandData(5) = CByte(AscW(ParaBirimi(0)) And &HFF)
-        SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)) And &HFF)
-        SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)) And &HFF)
-        SSPCommand.CommandDataLength = 8
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_LEVEL")
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
-            Return CInt(SSPCommand.ResponseData(1))
-        End If
+
+            Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot)
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_DENOMINATION_LEVEL
+            SSPCommand.CommandData(1) = MiktarBytes(0)
+            SSPCommand.CommandData(2) = MiktarBytes(1)
+            SSPCommand.CommandData(3) = MiktarBytes(2)
+            SSPCommand.CommandData(4) = MiktarBytes(3)
+
+            SSPCommand.CommandData(5) = CByte(AscW(ParaBirimi(0)) And &HFF)
+            SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)) And &HFF)
+            SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)) And &HFF)
+            SSPCommand.CommandDataLength = 8
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_LEVEL")
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                Return CInt(SSPCommand.ResponseData(1))
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
+
+        Timer_Durdur()
 
         Return 0
     End Function
@@ -922,25 +969,32 @@ Public Class NV200_SDK
 
     Public Function Kanal_Yonlendirme_Getir(Banknot As Integer, ParaBirimi As Char()) As Boolean
 
-        Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot) ' Notun şu anda geri dönüşümde olup olmadığını belirle
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_DENOMINATION_ROUTE
-        SSPCommand.CommandData(1) = MiktarBytes(0)
-        SSPCommand.CommandData(2) = MiktarBytes(1)
-        SSPCommand.CommandData(3) = MiktarBytes(2)
-        SSPCommand.CommandData(4) = MiktarBytes(3)
-        SSPCommand.CommandData(5) = CByte(AscW(ParaBirimi(0)))  ' Para birimini ekle
-        SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)))
-        SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)))
-        SSPCommand.CommandDataLength = 8
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_ROUTE")
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
-            If SSPCommand.ResponseData(1) = &H0 Then
-                Return False ' False ise değil
-            ElseIf SSPCommand.ResponseData(1) = &H1 Then
-                Return True
-            End If
-        End If
+        Timer_Durdur()
+        Try
 
+
+            Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot) ' Notun şu anda geri dönüşümde olup olmadığını belirle
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_GET_DENOMINATION_ROUTE
+            SSPCommand.CommandData(1) = MiktarBytes(0)
+            SSPCommand.CommandData(2) = MiktarBytes(1)
+            SSPCommand.CommandData(3) = MiktarBytes(2)
+            SSPCommand.CommandData(4) = MiktarBytes(3)
+            SSPCommand.CommandData(5) = CByte(AscW(ParaBirimi(0)))  ' Para birimini ekle
+            SSPCommand.CommandData(6) = CByte(AscW(ParaBirimi(1)))
+            SSPCommand.CommandData(7) = CByte(AscW(ParaBirimi(2)))
+            SSPCommand.CommandDataLength = 8
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_GET_DENOMINATION_ROUTE")
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                If SSPCommand.ResponseData(1) = &H0 Then
+                    Return False ' False ise değil
+                ElseIf SSPCommand.ResponseData(1) = &H1 Then
+                    Return True
+                End If
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
         Return False
     End Function
@@ -949,39 +1003,47 @@ Public Class NV200_SDK
     Public Function Banknot_Yonlendir(Banknot As Integer, ParaBirimi As String, KasayaIndir As Boolean) As Nakit_Para_Status
 
 
+
         Log_Yazdir("Banknot Yönlendirme Yapılıyor.")
         Dim ParaBirimChr() As Char = ParaBirimi.ToCharArray
         If ParaBirimChr.Count <> 3 Then
             Log_Yazdir("Banknot Yönlendirme Para Birimi Geçersiz.")
             Return Nakit_Para_Status.Basarisiz
         End If
-
         Timer_Durdur()
-        Banknot *= BanknotCarpanDeger
 
-        Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot) ' Notun şu anda geri dönüşümde olup olmadığını belirle
+        Try
 
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_DENOMINATION_ROUTE
-        SSPCommand.CommandData(1) = CByte(Math.Abs(CInt(KasayaIndir))) '0 ise, Arka Para verme Haznesi 1 ise Kasaya İndirir.
-        SSPCommand.CommandData(2) = MiktarBytes(0)
-        SSPCommand.CommandData(3) = MiktarBytes(1)
-        SSPCommand.CommandData(4) = MiktarBytes(2)
-        SSPCommand.CommandData(5) = MiktarBytes(3)
-        SSPCommand.CommandData(6) = CByte(AscW(ParaBirimChr(0)))  ' Para birimini ekle
-        SSPCommand.CommandData(7) = CByte(AscW(ParaBirimChr(1)))
-        SSPCommand.CommandData(8) = CByte(AscW(ParaBirimChr(2)))
-        SSPCommand.CommandDataLength = 9
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_DENOMINATION_ROUTE")
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+            Banknot *= BanknotCarpanDeger
 
-            Dim KasaStr As String = "Kasaya İnecek"
-            If KasayaIndir = False Then
-                KasaStr = "Kasete Gönderilecek."
+            Dim MiktarBytes As Byte() = BitConverter.GetBytes(Banknot) ' Notun şu anda geri dönüşümde olup olmadığını belirle
+
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_DENOMINATION_ROUTE
+            SSPCommand.CommandData(1) = CByte(Math.Abs(CInt(KasayaIndir))) '0 ise, Arka Para verme Haznesi 1 ise Kasaya İndirir.
+            SSPCommand.CommandData(2) = MiktarBytes(0)
+            SSPCommand.CommandData(3) = MiktarBytes(1)
+            SSPCommand.CommandData(4) = MiktarBytes(2)
+            SSPCommand.CommandData(5) = MiktarBytes(3)
+            SSPCommand.CommandData(6) = CByte(AscW(ParaBirimChr(0)))  ' Para birimini ekle
+            SSPCommand.CommandData(7) = CByte(AscW(ParaBirimChr(1)))
+            SSPCommand.CommandData(8) = CByte(AscW(ParaBirimChr(2)))
+            SSPCommand.CommandDataLength = 9
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_DENOMINATION_ROUTE")
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+
+                Dim KasaStr As String = "Kasaya İnecek"
+                If KasayaIndir = False Then
+                    KasaStr = "Kasete Gönderilecek."
+                End If
+                Log_Yazdir("Banknot Yönlendirme Başarılı." & KasaStr)
+                Timer_Baslat()
+                Return Nakit_Para_Status.Basarili
             End If
-            Log_Yazdir("Banknot Yönlendirme Başarılı." & KasaStr)
-            Timer_Baslat()
-            Return Nakit_Para_Status.Basarili
-        End If
+
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
         Timer_Baslat()
         Log_Yazdir("Banknot Yönlendirme Başarısız.")
@@ -1005,7 +1067,8 @@ Public Class NV200_SDK
                 SerialComPort.Close()
                 SerialComPort = Nothing
             End If
-        Catch
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
         End Try
         Return True
     End Function
@@ -1014,189 +1077,198 @@ Public Class NV200_SDK
     ' SSP SEND COMMAND (ORİJİNAL)
     ' ----------------------------------------------------------------
     Private Function SSPSendCommand(ByVal cmd As SSP_COMMAND) As PORT_STATUS
-
-        Array.Clear(ssp.rxData, 0, ssp.rxData.Length)
-        If cmd.CommandData(0) = &H11 Then
-            cmd.sspSeq = 128
-        End If
-
-        With SspInfo.PreEncryptedTransmit  ' Ön şifrelenmemiş paket oluştur
-            .PacketLength = CByte(cmd.CommandDataLength + 5)
-            .PacketData(0) = &H7F
-            .PacketData(1) = CByte(cmd.SSPAddress Or cmd.sspSeq)
-            .PacketData(2) = cmd.CommandDataLength
-            Buffer.BlockCopy(cmd.CommandData, 0, .PacketData, 3, cmd.CommandDataLength)
-            Dim crc As UShort = Crc_Hesapla(CUShort(cmd.CommandDataLength + 2), 1US, .PacketData, UShort.MaxValue, 32773US)
-            .PacketData(3 + cmd.CommandDataLength) = CByte(crc And &HFFUS)
-            .PacketData(4 + cmd.CommandDataLength) = CByte((crc >> 8) And &HFFUS)
-        End With
-
-
-        If cmd.EncryptionStatus Then ' Şifreleme etkinse
-
-            Try
-                Dim BytesP(254) As Byte
-                Dim totalLength As Integer = cmd.CommandDataLength + 7
-                Dim padding As Integer = (16 - (totalLength Mod 16)) Mod 16
-                Dim finalLen As Integer = totalLength + padding
-                BytesP(0) = cmd.CommandDataLength
-
-                For i As Integer = 0 To 3  ' Paket sayacı (4 byte)
-                    BytesP(1 + i) = CByte((cmd.encPktCount >> (8 * i)) And &HFFUI)
-                Next
-
-                ' Komut verisini kopyala
-                Buffer.BlockCopy(cmd.CommandData, 0, BytesP, 5, cmd.CommandDataLength)
-
-                ' Rastgele padding ekle
-                For i As Integer = 0 To padding - 1
-                    BytesP(5 + cmd.CommandDataLength + i) = CByte(GenerateRandomNumber() Mod 256UL)
-                Next
-
-                Dim crcValue As UShort = Crc_Hesapla(CUShort(finalLen - 2), 0US, BytesP, UShort.MaxValue, 32773US)  ' CRC hesapla ve ekle
-                BytesP(finalLen - 2) = CByte(crcValue And &HFFUS)
-                BytesP(finalLen - 1) = CByte((crcValue >> 8) And &HFFUS)
-
-
-                Dim lengthForAes As Byte = CByte(finalLen)  ' AES şifreleme
-                Aes_Encrypt(cmd.Key, BytesP, lengthForAes, 0)
-
-
-                cmd.CommandDataLength = CByte(finalLen + 1)  ' Çıkış paketini hazırla
-                cmd.CommandData(0) = &H7E
-                Buffer.BlockCopy(BytesP, 0, cmd.CommandData, 1, finalLen)
-                cmd.encPktCount = If(cmd.encPktCount = UInteger.MaxValue, 0UI, cmd.encPktCount + 1UI)    ' Paket sayacını artır
-            Catch
-
-                Log_Yazdir("Sifreleme Durumu:" & cmd.EncryptionStatus & " Paket Hesaplama Hatası.")
-                Return PORT_STATUS.SSP_PACKET_ERROR
-            End Try
-        End If
-
-
-
-        ' SSP TX paketi oluştur
-        ssp.CheckStuff = 0
-        ssp.SSPAddress = cmd.SSPAddress
-        ssp.rxPtr = 0
-        ssp.txPtr = 0
-        ssp.txBufferLength = CByte(cmd.CommandDataLength + 5)
-        ssp.txData(0) = &H7F
-        ssp.txData(1) = CByte(cmd.SSPAddress Or cmd.sspSeq)
-        ssp.txData(2) = cmd.CommandDataLength
-        Buffer.BlockCopy(cmd.CommandData, 0, ssp.txData, 3, cmd.CommandDataLength)
-
-        Dim crc2 As UShort = Crc_Hesapla(CUShort(ssp.txBufferLength - 3), 1US, ssp.txData, UShort.MaxValue, 32773US)
-        ssp.txData(3 + cmd.CommandDataLength) = CByte(crc2 And &HFFUS)
-        ssp.txData(4 + cmd.CommandDataLength) = CByte((crc2 >> 8) And &HFFUS)
-
-        ' Kopyala
-        Buffer.BlockCopy(ssp.txData, 0, SspInfo.Transmit.PacketData, 0, ssp.txBufferLength)
-        SspInfo.Transmit.PacketLength = ssp.txBufferLength
-
-        ' Stuffing işlemi
-        Dim temp(254) As Byte
-        Dim outIndex As Integer = 0
-        temp(outIndex) = ssp.txData(0)
-        outIndex += 1
-
-        For i As Integer = 1 To ssp.txBufferLength - 1
-            temp(outIndex) = ssp.txData(i)
-            outIndex += 1
-            If ssp.txData(i) = &H7F Then
-                temp(outIndex) = &H7F
-                outIndex += 1
-            End If
-        Next
-
-        Buffer.BlockCopy(temp, 0, ssp.txData, 0, outIndex)
-        ssp.txBufferLength = CByte(outIndex)
-
-
-
-        ssp.NewResponse = False
-        ssp.rxBufferLength = 0
-        ssp.rxPtr = 0
-
-
         Try
 
-            SerialComPort.Write(ssp.txData, 0, ssp.txBufferLength)
-        Catch
-            Log_Yazdir("Seriport Hatası Bağlantı Kapatıldı.")
-            Baglantiyi_Kapat()
-            Return PORT_STATUS.PORT_ERROR
+
+            Array.Clear(ssp.rxData, 0, ssp.rxData.Length)
+            If cmd.CommandData(0) = &H11 Then
+                cmd.sspSeq = 128
+            End If
+
+            With SspInfo.PreEncryptedTransmit  ' Ön şifrelenmemiş paket oluştur
+                .PacketLength = CByte(cmd.CommandDataLength + 5)
+                .PacketData(0) = &H7F
+                .PacketData(1) = CByte(cmd.SSPAddress Or cmd.sspSeq)
+                .PacketData(2) = cmd.CommandDataLength
+                Buffer.BlockCopy(cmd.CommandData, 0, .PacketData, 3, cmd.CommandDataLength)
+                Dim crc As UShort = Crc_Hesapla(CUShort(cmd.CommandDataLength + 2), 1US, .PacketData, UShort.MaxValue, 32773US)
+                .PacketData(3 + cmd.CommandDataLength) = CByte(crc And &HFFUS)
+                .PacketData(4 + cmd.CommandDataLength) = CByte((crc >> 8) And &HFFUS)
+            End With
+
+
+            If cmd.EncryptionStatus Then ' Şifreleme etkinse
+
+                Try
+                    Dim BytesP(254) As Byte
+                    Dim totalLength As Integer = cmd.CommandDataLength + 7
+                    Dim padding As Integer = (16 - (totalLength Mod 16)) Mod 16
+                    Dim finalLen As Integer = totalLength + padding
+                    BytesP(0) = cmd.CommandDataLength
+
+                    For i As Integer = 0 To 3  ' Paket sayacı (4 byte)
+                        BytesP(1 + i) = CByte((cmd.encPktCount >> (8 * i)) And &HFFUI)
+                    Next
+
+                    ' Komut verisini kopyala
+                    Buffer.BlockCopy(cmd.CommandData, 0, BytesP, 5, cmd.CommandDataLength)
+
+                    ' Rastgele padding ekle
+                    For i As Integer = 0 To padding - 1
+                        BytesP(5 + cmd.CommandDataLength + i) = CByte(GenerateRandomNumber() Mod 256UL)
+                    Next
+
+                    Dim crcValue As UShort = Crc_Hesapla(CUShort(finalLen - 2), 0US, BytesP, UShort.MaxValue, 32773US)  ' CRC hesapla ve ekle
+                    BytesP(finalLen - 2) = CByte(crcValue And &HFFUS)
+                    BytesP(finalLen - 1) = CByte((crcValue >> 8) And &HFFUS)
+
+
+                    Dim lengthForAes As Byte = CByte(finalLen)  ' AES şifreleme
+                    Aes_Encrypt(cmd.Key, BytesP, lengthForAes, 0)
+
+
+                    cmd.CommandDataLength = CByte(finalLen + 1)  ' Çıkış paketini hazırla
+                    cmd.CommandData(0) = &H7E
+                    Buffer.BlockCopy(BytesP, 0, cmd.CommandData, 1, finalLen)
+                    cmd.encPktCount = If(cmd.encPktCount = UInteger.MaxValue, 0UI, cmd.encPktCount + 1UI)    ' Paket sayacını artır
+                Catch
+
+                    Log_Yazdir("Sifreleme Durumu:" & cmd.EncryptionStatus & " Paket Hesaplama Hatası.")
+                    Return PORT_STATUS.SSP_PACKET_ERROR
+                End Try
+            End If
+
+
+
+            ' SSP TX paketi oluştur
+            ssp.CheckStuff = 0
+            ssp.SSPAddress = cmd.SSPAddress
+            ssp.rxPtr = 0
+            ssp.txPtr = 0
+            ssp.txBufferLength = CByte(cmd.CommandDataLength + 5)
+            ssp.txData(0) = &H7F
+            ssp.txData(1) = CByte(cmd.SSPAddress Or cmd.sspSeq)
+            ssp.txData(2) = cmd.CommandDataLength
+            Buffer.BlockCopy(cmd.CommandData, 0, ssp.txData, 3, cmd.CommandDataLength)
+
+            Dim crc2 As UShort = Crc_Hesapla(CUShort(ssp.txBufferLength - 3), 1US, ssp.txData, UShort.MaxValue, 32773US)
+            ssp.txData(3 + cmd.CommandDataLength) = CByte(crc2 And &HFFUS)
+            ssp.txData(4 + cmd.CommandDataLength) = CByte((crc2 >> 8) And &HFFUS)
+
+            ' Kopyala
+            Buffer.BlockCopy(ssp.txData, 0, SspInfo.Transmit.PacketData, 0, ssp.txBufferLength)
+            SspInfo.Transmit.PacketLength = ssp.txBufferLength
+
+            ' Stuffing işlemi
+            Dim temp(254) As Byte
+            Dim outIndex As Integer = 0
+            temp(outIndex) = ssp.txData(0)
+            outIndex += 1
+
+            For i As Integer = 1 To ssp.txBufferLength - 1
+                temp(outIndex) = ssp.txData(i)
+                outIndex += 1
+                If ssp.txData(i) = &H7F Then
+                    temp(outIndex) = &H7F
+                    outIndex += 1
+                End If
+            Next
+
+            Buffer.BlockCopy(temp, 0, ssp.txData, 0, outIndex)
+            ssp.txBufferLength = CByte(outIndex)
+
+
+
+            ssp.NewResponse = False
+            ssp.rxBufferLength = 0
+            ssp.rxPtr = 0
+
+
+            Try
+
+                SerialComPort.Write(ssp.txData, 0, ssp.txBufferLength)
+            Catch
+                Log_Yazdir("Seriport Hatası Bağlantı Kapatıldı.")
+                Baglantiyi_Kapat()
+                Return PORT_STATUS.PORT_ERROR
+            End Try
+
+
+            Dim sw As New Stopwatch()
+            sw.Start()
+
+            While Not ssp.NewResponse
+                If sw.ElapsedMilliseconds > cmd.Timeout Then
+                    sw.Stop()
+                    Log_Yazdir("Veri Dinlerken, Zaman Aşımı Oluştu. Beklenilen Süre:" & sw.ElapsedMilliseconds & " ms")
+                    Return PORT_STATUS.SSP_CMD_TIMEOUT
+                    Exit While
+                End If
+            End While
+
+
+            SspInfo.Receive.PacketLength = CByte(ssp.rxData(2) + 5)
+            For i As Integer = 0 To SspInfo.Receive.PacketLength - 1
+                SspInfo.Receive.PacketData(i) = ssp.rxData(i)
+            Next
+
+            ' Şifre çözme
+            If ssp.rxData(3) = 126 Then
+                Dim length As Byte = CByte(ssp.rxData(2) - 1)
+                Aes_Decrypt(cmd.Key, ssp.rxData, length, 4)
+
+                Dim num As UShort = Crc_Hesapla(CUShort(length - 2), 4, ssp.rxData, UShort.MaxValue, 32773)
+                If CByte(num And &HFF) <> ssp.rxData(ssp.rxData(2) + 1) OrElse
+                   CByte((num >> 8) And &HFF) <> ssp.rxData(ssp.rxData(2) + 2) Then
+                    Return PORT_STATUS.SSP_PACKET_ERROR_CRC_FAIL
+                End If
+
+                Dim num2 As UInteger = 0
+                For i As Integer = 0 To 3
+                    num2 += CUInt(ssp.rxData(5 + i)) << (i * 8)
+                Next
+
+                If num2 <> cmd.encPktCount Then
+                    Return PORT_STATUS.SSP_PACKET_ERROR_ENC_COUNT
+                End If
+
+                ssp.rxBufferLength = CByte(ssp.rxData(4) + 5)
+                Dim p(254) As Byte
+                p(0) = ssp.rxData(0)
+                p(1) = ssp.rxData(1)
+                p(2) = ssp.rxData(4)
+                For i As Integer = 0 To ssp.rxData(4) - 1
+                    p(3 + i) = ssp.rxData(9 + i)
+                Next
+
+                num = Crc_Hesapla(CUShort(ssp.rxBufferLength - 3), 1, p, UShort.MaxValue, 32773)
+                p(3 + ssp.rxData(4)) = CByte(num And &HFF)
+                p(4 + ssp.rxData(4)) = CByte((num >> 8) And &HFF)
+
+                For i As Integer = 0 To ssp.rxBufferLength - 1
+                    ssp.rxData(i) = p(i)
+                Next
+            End If
+
+            cmd.ResponseDataLength = ssp.rxData(2)
+            For i As Integer = 0 To cmd.ResponseDataLength - 1
+                cmd.ResponseData(i) = ssp.rxData(i + 3)
+            Next
+
+            If cmd.sspSeq = 128 Then
+                cmd.sspSeq = 0
+            Else
+                cmd.sspSeq = 128
+            End If
+            Log_Yazdir("Veri Gönderme Başarılı.")
+            Return PORT_STATUS.Veri_Gonderme_Basarili
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
         End Try
 
-
-        Dim sw As New Stopwatch()
-        sw.Start()
-
-        While Not ssp.NewResponse
-            If sw.ElapsedMilliseconds > cmd.Timeout Then
-                sw.Stop()
-                Log_Yazdir("Veri Dinlerken, Zaman Aşımı Oluştu. Beklenilen Süre:" & sw.ElapsedMilliseconds & " ms")
-                Return PORT_STATUS.SSP_CMD_TIMEOUT
-                Exit While
-            End If
-        End While
-
-
-        SspInfo.Receive.PacketLength = CByte(ssp.rxData(2) + 5)
-        For i As Integer = 0 To SspInfo.Receive.PacketLength - 1
-            SspInfo.Receive.PacketData(i) = ssp.rxData(i)
-        Next
-
-        ' Şifre çözme
-        If ssp.rxData(3) = 126 Then
-            Dim length As Byte = CByte(ssp.rxData(2) - 1)
-            Aes_Decrypt(cmd.Key, ssp.rxData, length, 4)
-
-            Dim num As UShort = Crc_Hesapla(CUShort(length - 2), 4, ssp.rxData, UShort.MaxValue, 32773)
-            If CByte(num And &HFF) <> ssp.rxData(ssp.rxData(2) + 1) OrElse
-               CByte((num >> 8) And &HFF) <> ssp.rxData(ssp.rxData(2) + 2) Then
-                Return PORT_STATUS.SSP_PACKET_ERROR_CRC_FAIL
-            End If
-
-            Dim num2 As UInteger = 0
-            For i As Integer = 0 To 3
-                num2 += CUInt(ssp.rxData(5 + i)) << (i * 8)
-            Next
-
-            If num2 <> cmd.encPktCount Then
-                Return PORT_STATUS.SSP_PACKET_ERROR_ENC_COUNT
-            End If
-
-            ssp.rxBufferLength = CByte(ssp.rxData(4) + 5)
-            Dim p(254) As Byte
-            p(0) = ssp.rxData(0)
-            p(1) = ssp.rxData(1)
-            p(2) = ssp.rxData(4)
-            For i As Integer = 0 To ssp.rxData(4) - 1
-                p(3 + i) = ssp.rxData(9 + i)
-            Next
-
-            num = Crc_Hesapla(CUShort(ssp.rxBufferLength - 3), 1, p, UShort.MaxValue, 32773)
-            p(3 + ssp.rxData(4)) = CByte(num And &HFF)
-            p(4 + ssp.rxData(4)) = CByte((num >> 8) And &HFF)
-
-            For i As Integer = 0 To ssp.rxBufferLength - 1
-                ssp.rxData(i) = p(i)
-            Next
-        End If
-
-        cmd.ResponseDataLength = ssp.rxData(2)
-        For i As Integer = 0 To cmd.ResponseDataLength - 1
-            cmd.ResponseData(i) = ssp.rxData(i + 3)
-        Next
-
-        If cmd.sspSeq = 128 Then
-            cmd.sspSeq = 0
-        Else
-            cmd.sspSeq = 128
-        End If
-        Log_Yazdir("Veri Gönderme Başarılı.")
-        Return PORT_STATUS.Veri_Gonderme_Basarili
+        Log_Yazdir("Veri Gönderme Başarısız")
+        Return PORT_STATUS.SSP_PACKET_ERROR
     End Function
 
 
@@ -1211,6 +1283,7 @@ Public Class NV200_SDK
                 SSPDataIn(CByte(SerialComPort.ReadByte()))
             End While
         Catch
+
         End Try
     End Sub
 
@@ -1233,49 +1306,59 @@ Public Class NV200_SDK
 
     Private Sub SSPDataIn(RxChar As Byte)
         ' Başlangıç baytı kontrolü
-        If RxChar = &H7F AndAlso ssp.rxPtr = 0 Then
-            ssp.rxData(ssp.rxPtr) = RxChar
-            ssp.rxPtr = CByte(ssp.rxPtr + 1)
-            Return
-        End If
 
-        If ssp.CheckStuff = 1 Then
-            If RxChar <> &H7F Then
-                ssp.rxData(0) = &H7F
-                ssp.rxData(1) = RxChar
-                ssp.rxPtr = 2
+
+        Try
+
+
+            If RxChar = &H7F AndAlso ssp.rxPtr = 0 Then
+                ssp.rxData(ssp.rxPtr) = RxChar
+                ssp.rxPtr = CByte(ssp.rxPtr + 1)
+                Return
+            End If
+
+            If ssp.CheckStuff = 1 Then
+                If RxChar <> &H7F Then
+                    ssp.rxData(0) = &H7F
+                    ssp.rxData(1) = RxChar
+                    ssp.rxPtr = 2
+                Else
+                    ssp.rxData(ssp.rxPtr) = RxChar
+                    ssp.rxPtr = CByte(ssp.rxPtr + 1)
+                End If
+                ssp.CheckStuff = 0
+            ElseIf RxChar = &H7F Then
+                ssp.CheckStuff = 1
             Else
                 ssp.rxData(ssp.rxPtr) = RxChar
                 ssp.rxPtr = CByte(ssp.rxPtr + 1)
+
+                If ssp.rxPtr = 3 Then
+                    ssp.rxBufferLength = CByte(ssp.rxData(2) + 5)
+                End If
             End If
+
+            ' Paket tamamlanmadıysa çık
+            If ssp.rxPtr <> ssp.rxBufferLength Then Return
+
+            ' CRC kontrolü
+            If (ssp.rxData(1) And &H7F) = ssp.SSPAddress Then
+                Dim crc As UShort = Crc_Hesapla(CUShort(ssp.rxBufferLength - 3), 1US, ssp.rxData, UShort.MaxValue, 32773US)
+                Dim crcLow As Byte = CByte(crc And &HFFUS)
+                Dim crcHigh As Byte = CByte((crc >> 8) And &HFFUS)
+
+                If crcLow = ssp.rxData(ssp.rxBufferLength - 2) AndAlso crcHigh = ssp.rxData(ssp.rxBufferLength - 1) Then
+                    ssp.NewResponse = True
+                End If
+            End If
+
+            ssp.rxPtr = 0
             ssp.CheckStuff = 0
-        ElseIf RxChar = &H7F Then
-            ssp.CheckStuff = 1
-        Else
-            ssp.rxData(ssp.rxPtr) = RxChar
-            ssp.rxPtr = CByte(ssp.rxPtr + 1)
 
-            If ssp.rxPtr = 3 Then
-                ssp.rxBufferLength = CByte(ssp.rxData(2) + 5)
-            End If
-        End If
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
-        ' Paket tamamlanmadıysa çık
-        If ssp.rxPtr <> ssp.rxBufferLength Then Return
-
-        ' CRC kontrolü
-        If (ssp.rxData(1) And &H7F) = ssp.SSPAddress Then
-            Dim crc As UShort = Crc_Hesapla(CUShort(ssp.rxBufferLength - 3), 1US, ssp.rxData, UShort.MaxValue, 32773US)
-            Dim crcLow As Byte = CByte(crc And &HFFUS)
-            Dim crcHigh As Byte = CByte((crc >> 8) And &HFFUS)
-
-            If crcLow = ssp.rxData(ssp.rxBufferLength - 2) AndAlso crcHigh = ssp.rxData(ssp.rxBufferLength - 1) Then
-                ssp.NewResponse = True
-            End If
-        End If
-
-        ssp.rxPtr = 0
-        ssp.CheckStuff = 0
     End Sub
 
 
@@ -1283,57 +1366,70 @@ Public Class NV200_SDK
 
 
     Private Sub Aes_Encrypt(ByRef sspKey As SSP_FULL_KEY, ByRef data() As Byte, ByRef length As Byte, ByVal offset As Byte)
-        Using memoryStream As New MemoryStream()
-            Using aesAlg As Aes = Aes.Create()
-                Dim keyArray(15) As Byte
+        Try
 
-                For b As Integer = 0 To 7
-                    keyArray(b) = CByte((sspKey.FixedKey >> (8 * b)) And &HFFUL)
-                    keyArray(b + 8) = CByte((sspKey.VariableKey >> (8 * b)) And &HFFUL)
-                Next
+            Using MemoryStream As New MemoryStream()
+                Using AesAlg As Aes = Aes.Create()
+                    Dim keyArray(15) As Byte
 
-                aesAlg.BlockSize = 128
-                aesAlg.KeySize = 128
-                aesAlg.Key = keyArray
-                aesAlg.Mode = CipherMode.ECB
-                aesAlg.Padding = PaddingMode.None
+                    For b As Integer = 0 To 7
+                        keyArray(b) = CByte((sspKey.FixedKey >> (8 * b)) And &HFFUL)
+                        keyArray(b + 8) = CByte((sspKey.VariableKey >> (8 * b)) And &HFFUL)
+                    Next
 
-                Using cryptoStream As New CryptoStream(memoryStream, aesAlg.CreateEncryptor(), CryptoStreamMode.Write)
-                    cryptoStream.Write(data, offset, length)
-                    cryptoStream.FlushFinalBlock()
+                    AesAlg.BlockSize = 128
+                    AesAlg.KeySize = 128
+                    AesAlg.Key = keyArray
+                    AesAlg.Mode = CipherMode.ECB
+                    AesAlg.Padding = PaddingMode.None
+
+                    Using cryptoStream As New CryptoStream(MemoryStream, AesAlg.CreateEncryptor(), CryptoStreamMode.Write)
+                        cryptoStream.Write(data, offset, length)
+                        cryptoStream.FlushFinalBlock()
+                    End Using
+
+                    Buffer.BlockCopy(MemoryStream.ToArray(), 0, data, offset, length)
                 End Using
-
-                Buffer.BlockCopy(memoryStream.ToArray(), 0, data, offset, length)
             End Using
-        End Using
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
     End Sub
 
 
     Private Sub Aes_Decrypt(ByRef sspKey As SSP_FULL_KEY, ByRef data() As Byte, ByRef length As Byte, ByVal offset As Byte)
-        Using memoryStream As New MemoryStream()
-            Using aesAlg As Aes = Aes.Create()
-                Dim keyArray(15) As Byte
+        Try
 
-                For b As Integer = 0 To 7
-                    keyArray(b) = CByte((sspKey.FixedKey >> (8 * b)) And &HFFUL)
-                    keyArray(b + 8) = CByte((sspKey.VariableKey >> (8 * b)) And &HFFUL)
-                Next
 
-                aesAlg.BlockSize = 128
-                aesAlg.KeySize = 128
-                aesAlg.Key = keyArray
-                aesAlg.Mode = CipherMode.ECB
-                aesAlg.Padding = PaddingMode.None
+            Using MemoryStream As New MemoryStream()
+                Using AesAlg As Aes = Aes.Create()
+                    Dim keyArray(15) As Byte
 
-                Using cryptoStream As New CryptoStream(memoryStream, aesAlg.CreateDecryptor(), CryptoStreamMode.Write)
-                    cryptoStream.Write(data, offset, length)
-                    cryptoStream.FlushFinalBlock()
+                    For b As Integer = 0 To 7
+                        keyArray(b) = CByte((sspKey.FixedKey >> (8 * b)) And &HFFUL)
+                        keyArray(b + 8) = CByte((sspKey.VariableKey >> (8 * b)) And &HFFUL)
+                    Next
+
+                    AesAlg.BlockSize = 128
+                    AesAlg.KeySize = 128
+                    AesAlg.Key = keyArray
+                    AesAlg.Mode = CipherMode.ECB
+                    AesAlg.Padding = PaddingMode.None
+
+                    Using cryptoStream As New CryptoStream(MemoryStream, AesAlg.CreateDecryptor(), CryptoStreamMode.Write)
+                        cryptoStream.Write(data, offset, length)
+                        cryptoStream.FlushFinalBlock()
+                    End Using
+
+                    Dim decryptedData As Byte() = MemoryStream.ToArray()
+                    Buffer.BlockCopy(decryptedData, 0, data, offset, length)
                 End Using
-
-                Dim decryptedData As Byte() = memoryStream.ToArray()
-                Buffer.BlockCopy(decryptedData, 0, data, offset, length)
             End Using
-        End Using
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
     End Sub
 
 
@@ -1341,46 +1437,53 @@ Public Class NV200_SDK
     ' ANAHTAR MÜZAKERESİ (ORİJİNAL)
     ' ----------------------------------------------------------------
     Private Function Protokolu_Sifresi_Olustur() As Boolean
-        If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen Then
+        Try
 
 
-            SSPCommand.EncryptionStatus = False
+            If SerialComPort IsNot Nothing AndAlso SerialComPort.IsOpen Then
 
-            Dim keys As New SSP_KEYS
-            InitiateSSPHostKeys(keys, SSPCommand)
 
-            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_GENERATOR
-            SSPCommand.CommandDataLength = 9
+                SSPCommand.EncryptionStatus = False
 
-            BitConverter.GetBytes(keys.Generator).CopyTo(SSPCommand.CommandData, 1)
-            Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_GENERATOR")
-            If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
+                Dim keys As New SSP_KEYS
+                InitiateSSPHostKeys(keys, SSPCommand)
 
-            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_MODULUS
-            SSPCommand.CommandDataLength = 9
+                SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_GENERATOR
+                SSPCommand.CommandDataLength = 9
 
-            BitConverter.GetBytes(keys.Modulus).CopyTo(SSPCommand.CommandData, 1)
-            Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_MODULUS")
-            If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
+                BitConverter.GetBytes(keys.Generator).CopyTo(SSPCommand.CommandData, 1)
+                Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_GENERATOR")
+                If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
 
-            SSPCommand.CommandData(0) = CCommands.SSP_CMD_REQUEST_KEY_EXCHANGE
-            SSPCommand.CommandDataLength = 9
-            BitConverter.GetBytes(keys.HostInter).CopyTo(SSPCommand.CommandData, 1)
-            Log_Yazdir("Gönderilen Komut:SSP_CMD_REQUEST_KEY_EXCHANGE")
-            If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
+                SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_MODULUS
+                SSPCommand.CommandDataLength = 9
 
-            keys.SlaveInterKey = BitConverter.ToUInt64(SSPCommand.ResponseData, 1)
-            CreateSSPHostEncryptionKey(keys)
+                BitConverter.GetBytes(keys.Modulus).CopyTo(SSPCommand.CommandData, 1)
+                Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_MODULUS")
+                If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
 
-            SSPCommand.Key.FixedKey = &H123456701234567UL
-            SSPCommand.Key.VariableKey = keys.KeyHost
-            SSPCommand.EncryptionStatus = True
+                SSPCommand.CommandData(0) = CCommands.SSP_CMD_REQUEST_KEY_EXCHANGE
+                SSPCommand.CommandDataLength = 9
+                BitConverter.GetBytes(keys.HostInter).CopyTo(SSPCommand.CommandData, 1)
+                Log_Yazdir("Gönderilen Komut:SSP_CMD_REQUEST_KEY_EXCHANGE")
+                If SSPSendCommand(SSPCommand) <> PORT_STATUS.Veri_Gonderme_Basarili Then Return False
 
-            Log_Yazdir("Anahtar Eşleşme Başarılı!")
-            Return True
-        Else
-            Log_Yazdir("Bağlantı Portu Kapalı.")
-        End If
+                keys.SlaveInterKey = BitConverter.ToUInt64(SSPCommand.ResponseData, 1)
+                CreateSSPHostEncryptionKey(keys)
+
+                SSPCommand.Key.FixedKey = &H123456701234567UL
+                SSPCommand.Key.VariableKey = keys.KeyHost
+                SSPCommand.EncryptionStatus = True
+
+                Log_Yazdir("Anahtar Eşleşme Başarılı!")
+                Return True
+            Else
+                Log_Yazdir("Bağlantı Portu Kapalı.")
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
         SSPCommand.EncryptionStatus = False
         Return False
@@ -1391,26 +1494,35 @@ Public Class NV200_SDK
 
         ' Inhibitleri ayarla
         Timer_Durdur()
-
-        Dim KanalSetByte As Byte = 0
-        For i As Integer = 0 To KanalList.Length - 1
-            KanalSetByte = CByte(KanalSetByte Or (KanalList(i) << i))
-        Next
+        Try
 
 
 
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_CHANNEL_INHIBITS
-        SSPCommand.CommandData(1) = KanalSetByte
-        SSPCommand.CommandData(2) = &HFF
-        SSPCommand.CommandDataLength = 3
-        Log_Yazdir("Kanallar Ayarlanıyor")
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_CHANNEL_INHIBITS")
 
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
-            Timer_Baslat()
-            Log_Yazdir("Kanal Ayarlama Başarılı.")
-            Return True
-        End If
+            Dim KanalSetByte As Byte = 0
+            For i As Integer = 0 To KanalList.Length - 1
+                KanalSetByte = CByte(KanalSetByte Or (KanalList(i) << i))
+            Next
+
+
+
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_CHANNEL_INHIBITS
+            SSPCommand.CommandData(1) = KanalSetByte
+            SSPCommand.CommandData(2) = &HFF
+            SSPCommand.CommandDataLength = 3
+            Log_Yazdir("Kanallar Ayarlanıyor")
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_CHANNEL_INHIBITS")
+
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                Timer_Baslat()
+                Log_Yazdir("Kanal Ayarlama Başarılı.")
+                Return True
+            End If
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
+
 
         Timer_Baslat()
         Log_Yazdir("Kanal Ayarlama Başarısız.")
@@ -1488,33 +1600,41 @@ Public Class NV200_SDK
 
     Function Limit_Belirle(Banknot As Integer, Adet As Byte, ParaBirimi As String) As Nakit_Para_Status
 
-        Timer_Durdur()
+
         Dim Birim() As Char = ParaBirimi.ToCharArray
         If Birim.Count <> 3 Then
             Return Nakit_Para_Status.Basarisiz
         End If
         Banknot *= BanknotCarpanDeger
 
-        SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_Limit_Belirle
-        SSPCommand.CommandData(1) = 1
-        SSPCommand.CommandData(2) = CByte(Adet And &HFF)          ' Low byte
-        SSPCommand.CommandData(3) = CByte((Adet >> 8) And &HFF)   ' High byte
-        SSPCommand.CommandData(4) = CByte(Banknot And &HFF)   ' Banknot değeri = 1000 (örnek: 10 TL)
-        SSPCommand.CommandData(5) = CByte((Banknot >> 8) And &HFF)
-        SSPCommand.CommandData(6) = CByte((Banknot >> 16) And &HFF)
-        SSPCommand.CommandData(7) = CByte((Banknot >> 24) And &HFF)
-        SSPCommand.CommandData(8) = CByte(AscW(ParaBirimi(0)))  ' Ülke kodu = "TRY"
-        SSPCommand.CommandData(9) = CByte(AscW(ParaBirimi(1)))
-        SSPCommand.CommandData(10) = CByte(AscW(ParaBirimi(2)))
-        SSPCommand.CommandDataLength = 11 ' toplam kaç byte doluysa
+        Timer_Durdur()
 
-        Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_Limit_Belirle")
-        If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
-            Timer_Baslat()
-            Log_Yazdir("Kanal Limit Ayarlama Başarılı.")
-            Return Nakit_Para_Status.Basarili
-        End If
+        Try
 
+            SSPCommand.CommandData(0) = CCommands.SSP_CMD_SET_Limit_Belirle
+            SSPCommand.CommandData(1) = 1
+            SSPCommand.CommandData(2) = CByte(Adet And &HFF)          ' Low byte
+            SSPCommand.CommandData(3) = CByte((Adet >> 8) And &HFF)   ' High byte
+            SSPCommand.CommandData(4) = CByte(Banknot And &HFF)   ' Banknot değeri = 1000 (örnek: 10 TL)
+            SSPCommand.CommandData(5) = CByte((Banknot >> 8) And &HFF)
+            SSPCommand.CommandData(6) = CByte((Banknot >> 16) And &HFF)
+            SSPCommand.CommandData(7) = CByte((Banknot >> 24) And &HFF)
+            SSPCommand.CommandData(8) = CByte(AscW(ParaBirimi(0)))  ' Ülke kodu = "TRY"
+            SSPCommand.CommandData(9) = CByte(AscW(ParaBirimi(1)))
+            SSPCommand.CommandData(10) = CByte(AscW(ParaBirimi(2)))
+            SSPCommand.CommandDataLength = 11 ' toplam kaç byte doluysa
+
+            Log_Yazdir("Gönderilen Komut:SSP_CMD_SET_Limit_Belirle")
+            If SSPSendCommand(SSPCommand) = PORT_STATUS.Veri_Gonderme_Basarili AndAlso Data_isleme_Basarili() Then
+                Timer_Baslat()
+                Log_Yazdir("Kanal Limit Ayarlama Başarılı.")
+                Return Nakit_Para_Status.Basarili
+            End If
+
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
 
 
         Timer_Baslat()
@@ -1595,9 +1715,6 @@ Public Class NV200_SDK
         Return True
     End Function
 
-    ' ----------------------------------------------------------------
-    ' MATEMATİK FONKSİYONLARI (ORİJİNAL)
-    ' ----------------------------------------------------------------
     Public Function GenerateRandomNumber() As ULong
         Dim tmp(7) As Byte
         RngCsp.GetBytes(tmp)
@@ -1605,6 +1722,7 @@ Public Class NV200_SDK
     End Function
 
     Public Function GeneratePrime() As ULong
+
         Dim tmp As ULong = GenerateRandomNumber() Mod &H7FFFFFFFUL
 
         If (tmp And 1UL) = 0UL Then
@@ -1624,36 +1742,50 @@ Public Class NV200_SDK
         PSEUDOPRIME
     End Enum
     Private Function MillerRabin(n As ULong, trials As UShort) As Primality
-        For i As UShort = 0US To CUShort(trials - 1US)
-            Dim nm3 As ULong = n - 3UL
-            Dim a As ULong = (GenerateRandomNumber() Mod nm3) + 2UL
-            If SingleMillerRabin(n, a) = Primality.COMPOSITE Then
-                Return Primality.COMPOSITE
-            End If
-        Next
+        Try
+
+
+            For i As UShort = 0US To CUShort(trials - 1US)
+                Dim nm3 As ULong = n - 3UL
+                Dim a As ULong = (GenerateRandomNumber() Mod nm3) + 2UL
+                If SingleMillerRabin(n, a) = Primality.COMPOSITE Then
+                    Return Primality.COMPOSITE
+                End If
+            Next
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
+
         Return Primality.PSEUDOPRIME
     End Function
 
     Private Function SingleMillerRabin(n As ULong, a As ULong) As Primality
-        Dim s As UShort = 0US
-        Dim d As ULong = n - 1UL
 
-        While (d And 1UL) = 0UL
-            s = CUShort(s + 1US)
-            d >>= 1
-        End While
+        Try
 
-        If s = 0US Then Return Primality.COMPOSITE
 
-        Dim x As ULong = XpowYmodN(a, d, n)
-        If x = 1UL OrElse x = (n - 1UL) Then Return Primality.PSEUDOPRIME
+            Dim s As UShort = 0US
+            Dim d As ULong = n - 1UL
 
-        For r As UShort = 1US To CUShort(s - 1US)
-            x = (x * x) Mod n
-            If x = 1UL Then Return Primality.COMPOSITE
-            If x = (n - 1UL) Then Return Primality.PSEUDOPRIME
-        Next
+            While (d And 1UL) = 0UL
+                s = CUShort(s + 1US)
+                d >>= 1
+            End While
 
+            If s = 0US Then Return Primality.COMPOSITE
+
+            Dim x As ULong = XpowYmodN(a, d, n)
+            If x = 1UL OrElse x = (n - 1UL) Then Return Primality.PSEUDOPRIME
+
+            For r As UShort = 1US To CUShort(s - 1US)
+                x = (x * x) Mod n
+                If x = 1UL Then Return Primality.COMPOSITE
+                If x = (n - 1UL) Then Return Primality.PSEUDOPRIME
+            Next
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
         Return Primality.COMPOSITE
     End Function
 
@@ -1676,16 +1808,53 @@ Public Class NV200_SDK
 
     Sub Log_Yazdir(Hata As String)
 
+        Try
 
-        If LogTextBox IsNot Nothing Then
-            If LogTextBox.Text.Length > 2000 Then
-                InvokeSync.Post(Sub() LogTextBox.ResetText(), Nothing)
+
+            If LogTextBox IsNot Nothing Then
+                If LogTextBox.Text.Length > 2000 Then
+                    InvokeSync.Post(Sub() LogTextBox.ResetText(), Nothing)
+                End If
+                InvokeSync.Post(Sub() LogTextBox.AppendText(Hata & vbCrLf), Nothing)
             End If
-            InvokeSync.Post(Sub() LogTextBox.AppendText(Hata & vbCrLf), Nothing)
+
+        Catch ex As Exception
+            Veri_Logla(ex.Message, True)
+        End Try
+
+    End Sub
+
+    Function Klasoru_Kontrol_Et_Yoksa_Olustur(KlasorAdi As String) As Boolean
+
+        Try
+            If Directory.Exists(Application.StartupPath & "\" & KlasorAdi) = False Then
+                My.Computer.FileSystem.CreateDirectory(Application.StartupPath & "\" & KlasorAdi) ' Klasör
+            End If
+
+            Return True
+
+        Catch ex As Exception
+            Veri_Logla("Klasoru_Kontrol_Et_Yoksa_Olustur>" & ex.Message, True)
+        End Try
+
+        Return False
+    End Function
+
+
+
+    Sub Veri_Logla(Log As String, Optional Hata As Boolean = False)
+
+        Console.WriteLine(Log)
+
+        If Klasoru_Kontrol_Et_Yoksa_Olustur("Log") Then
+            Try
+                Dim LogYaz As New StreamWriter(LogErrorKlasorYolu & "\Kiosk Log (" & Today.ToString("dd-MM-yyyy") & ").txt", True)
+                LogYaz.WriteLine("-" & TimeOfDay & " > " & Log)
+                LogYaz.Close()
+            Catch ex As Exception
+
+            End Try
         End If
-
-
-
     End Sub
 
 End Class
